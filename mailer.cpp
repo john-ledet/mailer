@@ -1,13 +1,8 @@
 #include <iostream>
 #include <string>
-#include <cstdio>
-#include <csignal>
-#include <atomic>
-#include <unistd.h>
-#include <sys/select.h>
-#include <cstdlib>
-#include <regex> 
 #include <curl/curl.h>
+#include <fstream>
+#include <sstream>
 
 struct upload_status {
     const char *payload;
@@ -31,80 +26,82 @@ size_t payload_source(void *ptr, size_t size, size_t nmemb, void *userp) {
     return len;
 }
 
-void mailer(const std::string& email) {
+void mailer(const std::string& email, const std::string& image_path) {
     CURL *curl;
     CURLcode res = CURLE_OK;
 
-    // Initialize libcurl
     curl = curl_easy_init();
-    if(curl) {
-        // Set the SMTP server URL (using Gmail's SMTP with SSL/TLS)
+    if (curl) {
+        // Set SMTP server URL
         curl_easy_setopt(curl, CURLOPT_URL, "smtps://smtp.gmail.com:465");
 
-        // Set the username and password for Gmail authentication
+        // Set authentication
         curl_easy_setopt(curl, CURLOPT_USERNAME, "brucewaynebatmangotham92@gmail.com");
         curl_easy_setopt(curl, CURLOPT_PASSWORD, "pvodpxlesymelkav");
 
-        // Set the "From" email address
-        curl_easy_setopt(curl, CURLOPT_MAIL_FROM, "<brucewaynebathmangotham92@gmail.com>");
-
-        // Set the "To" email address
+        // Set "From" and "To" email addresses
+        curl_easy_setopt(curl, CURLOPT_MAIL_FROM, "<brucewaynebatmangotham92@gmail.com>");
         struct curl_slist *recipients = nullptr;
         recipients = curl_slist_append(recipients, ("<" + email + ">").c_str());
         curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 
-        // Define the email message
-        const std::string payload_text = 
-            "To: " + email + "\r\n"
-            "From: brucewaynebathmangotham92@gmail.com\r\n"
-            "Subject: Test Email\r\n"
-            "\r\n"
-            "This is a test email sent from C++ using libcurl.\r\n";
+        // Create MIME structure for email
+        curl_mime *mime;
+        curl_mimepart *part;
+        mime = curl_mime_init(curl);
 
-        upload_status upload_ctx = { payload_text.c_str(), payload_text.size() };
+        // Add the email text part
+        part = curl_mime_addpart(mime);
+        curl_mime_data(part, "This is a test email sent from C++ with an image attachment.", CURL_ZERO_TERMINATED);
 
-        // Configure payload callback
-        curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
-        curl_easy_setopt(curl, CURLOPT_READDATA, &upload_ctx);
-        curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+        // Add the subject header
+        curl_easy_setopt(curl, CURLOPT_MAIL_FROM, "Subject: Test Email with Attachment\r\n");
+
+        // Add the image attachment part
+        part = curl_mime_addpart(mime);
+        curl_mime_filedata(part, image_path.c_str());
+        curl_mime_filename(part, "image.jpg");  // Name of the attachment
+        curl_mime_type(part, "image/jpeg");     // MIME type
+
+        // Attach the MIME structure to the email
+        curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
 
         // Enable SSL/TLS
         curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
 
-        // Perform the send
+        // Send the email
         res = curl_easy_perform(curl);
-
-        // Check for errors
-        if(res != CURLE_OK) {
+        if (res != CURLE_OK) {
             std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
         } else {
-            std::cout << "Email sent successfully!" << std::endl;
+            std::cout << "Email with image sent successfully!" << std::endl;
         }
 
         // Clean up
         curl_slist_free_all(recipients);
+        curl_mime_free(mime);
         curl_easy_cleanup(curl);
     }
 }
 
-void emailvalidation(const std::string& email) {
+void emailvalidation(const std::string& email, const std::string& image_path) {
     std::string newemail;
     const std::regex pattern ("(\\w+)(\\.|_)?(\\w*)@(\\w+)(\\.(\\w+))+");
     if (std::regex_match(email,pattern)) {
         std::cout << "Please wait and check your email for next steps." << std::endl;
-        mailer(email);
+        mailer(email, image_path);
     } else {
         std::cout << "Invalid email please try again: ";
         std::cin >> newemail;
         std::cout << std::endl;
-        emailvalidation(newemail);
+        emailvalidation(newemail, image_path);
     }
 }
 
 int main() {
     std::string email;
-    std::cout << "Please enter a valid email address: ";
-    std::cin >> email;
-    emailvalidation(email);
-    std::cout << std::endl;
+    std::string image_path = "path/to/your/image.jpg";
+    std::cout << "Please enter a valid "
+    email_validation(mail, image_path);
+    return 0;
 }
